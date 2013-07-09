@@ -1,0 +1,36 @@
+#!/bin/sh /etc/rc.common
+
+START=900
+STOP=10
+
+SERVICE_DAEMONIZE=1
+SERVICE_WRITE_PID=1
+
+boot() {
+	# Load her up
+	echo "Booting the wheredial"
+	stty -F /dev/ttyACM0 
+	start
+}
+
+
+start() {
+	# Start her up!
+	echo "Starting the wheredial"
+	service_start /root/wheredial.sh -d
+}
+
+stop() {
+	# Shut her down!
+	echo "Stopping the wheredial"
+	service_stop /root/wheredial.sh
+	echo r > /dev/ttyACM0
+	echo date > /root/wheredial_log
+	tail -100 /tmp/wheredial_log >> /root/wheredial_log
+}
+
+reload() {
+	echo "Reloading wheredial"
+	echo r > /dev/ttyACM0
+	service_reload /root/wheredial.sh
+}
