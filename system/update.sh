@@ -12,6 +12,6 @@ if [ -z "$check" ]; then
 	exit 1
 fi
 
-echo "CheckSum Good, contining"
+echo "CheckSum Good, continuing"
 
 sysupgrade -v /tmp/openwrt-ar71xx-generic-tl-wr703n-v1-squashfs-sysupgrade.bin
