@@ -37,8 +37,7 @@ while true; do
 	fi
 
 	# Get the page source 
-	#wheredial_page_source=$(wget -S -qO- "http://mapme.at/api/wheredial.csv?mac=$wheredial_mac" 2>&1)
-	wheredial_page_source=$(/root/simplehttpc "$wheredial_mac" "$wheredial_position" "$wheredial_hash" )
+	wheredial_page_source=$(/root/keepalivehttpc "http://$wheredial_url?&position=$wheredial_position&placeHash=$wheredial_hash" )
 	if [ -n "$wheredial_page_source" ]; then
 		echo "[$(uptime | awk '{print $1}')] - 2. Connected to server" >> "$log_file" 
 		echo 4 > /dev/ttyACM0
@@ -108,13 +107,3 @@ while true; do
 done
 
 exit 0
-while true; do
-	echo "1"
-	wheredial_page_content=$(wget -qO- "http://live.mapme.at/wheredial.csv?mac=$wheredial_mac&position=$wheredial_position&placeHash=$wheredial_last_hash")
-	wheredial_loop_position=$(echo $wheredial_page_content | sed -e "s/\(.*\),\(.*\)$/\1/")
-	wheredial_last_hash=$(echo $wheredial_page_content | sed -e "s/\(.*\),\(.*\)$/\2/")
-	
-	echo "t$wheredial_loop_position" > /dev/ttyACM0
-	
-	echo "Update the dial!"
-done
