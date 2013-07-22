@@ -7,9 +7,8 @@ wheredial_mac=$(ifconfig | grep -m 1 -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{
 log_file="/tmp/wheredial_log"
 echo "[$(uptime | awk '{print $1}')] - 0. Loading the wheredial ($wheredial_mac)" >> "$log_file"
 
-
 # Downloading Config
-wheredial_config=$(wget -qO- "http://mapme.at/api/wheredial.cs?config=yes&mac=$wheredial_mac")
+wheredial_config=$(/root/keepalivehttpc "http://mapme.at/api/wheredial.cs?config=yes&mac=$wheredial_mac" | tail -1)
 wheredial_url=$(echo "$wheredial_config" | awk -F, '{print $1":"$2$3}')
 wheredial_domain=$(echo "$wheredial_config" | awk -F, '{print $1}') 
 wheredial_sleep=$(echo "$wheredial_config" | awk -F, '{print $4}')
@@ -43,24 +42,23 @@ while true; do
 		echo 4 > /dev/ttyACM0
 		sleep 1
 	else 
-		echo "[$(uptime | awk '{print $1}')] - 2. Couldn't connect to server" >> "$log_file" 	
-		echo 0 > /dev/ttyACM0                                                                                       
-		sleep 6                                                                                                     
-		echo 43210 > /dev/ttyACM0                                                                                    
+		echo "[$(uptime | awk '{print $1}')] - 2. Couldn't connect to server" >> "$log_file" 
+		echo 0 > /dev/ttyACM0 
+		sleep 6
+		43210 > /dev/ttyACM
 		sleep 2
 		continue
 	fi
 
-
 	# Status Code
 	wheredial_status_code=$(echo "$wheredial_page_source"| grep "HTTP/1.1" | awk '{print $2}')
 
-	if [ $wheredial_status_code -ge 200 ] &&  [ $wheredial_status_code -le 300 ]; then 
+	if [ $wheredial_status_code -ge 200 ] &&  [ $wheredial_status_code -le 300 ]; then
 		echo "[$(uptime | awk '{print $1}')] - 3. Valid status code: $wheredial_status_code" >> "$log_file"
  		echo 3 > /dev/ttyACM0
 		sleep 1
 	else
-		echo "[$(uptime | awk '{print $1}')] - 3. Invalid status code: $wheredial_status_code" >> "$log_file" 
+		echo "[$(uptime | awk '{print $1}')] - 3. Invalid status code: $wheredial_status_code" >> "$log_file"
 		echo 0 > /dev/ttyACM0
 		sleep 6
 		echo 3210 > /dev/ttyACM0
@@ -73,24 +71,29 @@ while true; do
 
 	# How much should I rotate?
 	wheredial_position=$(echo $wheredial_page_content | sed -n 's/^\([0-9]\{1,3\}\),\([[:alnum:]]\{40\}\)\(,[[:alnum:]]*\)*$/\1/p')
-		
+
 	# What is the hash for my last request?
 	wheredial_hash=$(echo $wheredial_page_content | sed -n 's/^\([0-9]\{1,3\}\),\([[:alnum:]]\{40\}\)\(,[[:alnum:]]*\)*$/\2/p')
 
 	# Check we have the page content
 	if [ -n $wheredial_position ] && [ -n $wheredial_hash ]; then
-		echo "[$(uptime | awk '{print $1}')] - 4. Have page content" >> "$log_file" 
+		echo "[$(uptime | awk '{print $1}')] - 4. Have page content" >> "$log_file"
 		if [ "$wheredial_hash" == "$wheredial_last_hash" ]; then
-			echo "[$(uptime | awk '{print $1}')] - 5. Same hash, no action. ($wheredial_position,$wheredial_hash)" >> "$log_file" 
+			echo "[$(uptime | awk '{print $1}')] - 5. Same hash, no action. ($wheredial_position,$wheredial_hash)" >> "$log_file"
 		else
-			echo "[$(uptime | awk '{print $1}')] - 5. Differing/New hash, moving the dial $wheredial_position. Hash: $wheredial_hash" >> "$log_file"                                                        
-			# Send move command to the dial                                                                    
-			echo "t$wheredial_position" > /dev/ttyACM0                                                         
-			# Need to think about this more ...                                                                
-			awk  "BEGIN { rounded = sprintf(\"%.0f\", $wheredial_position*0.07); print rounded }" | xargs sleep
+			echo "[$(uptime | awk '{print $1}')] - 5. Differing/New hash, moving the dial $wheredial_position. Hash: $wheredial_hash" >> "$log_file" 
+			# Send move command to the dial
+			echo "t$wheredial_position" > /dev/ttyACM0
+			
+			# Wait for dial to turn
+			diff=$(($wheredial_last_postion-$wheredial_position))
+			if [ $diff -eq 0 ]; then diff=360; fi
+			awk  "BEGIN { rounded = sprintf(\"%.0f\", $diff*0.0711); rounded=(rounded<0)?-rounded:rounded; print rounded }" | xargs sleep
+			
 			echo "[$(uptime | awk '{print $1}')] - 6. Finished turning" >> "$log_file"       
 		fi
 		wheredial_last_hash="$wheredial_hash"
+		wheredial_last_position="$wheredial_position"
 		echo 21 > /dev/ttyACM0 
 	else
 		echo "[$(uptime | awk '{print $1}')] - 4. Don't have page content" >> "$log_file" 	
@@ -100,7 +103,7 @@ while true; do
 		sleep 2
 		continue
 	fi
-	# Sleep for a moment. Hmm 60 times an hour, 1440 times a day :0
+ 	
  	sleep $wheredial_sleep
 	
 	echo "=============================================" >> "$log_file" 
