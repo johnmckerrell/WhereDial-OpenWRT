@@ -25,14 +25,14 @@ stop() {
 	echo "Stopping the wheredial"
 	service_stop /root/wheredial.sh
 	pidof wheredial.sh | xargs kill
-    pidof keepalivehttpc | xargs kill
-    echo r > /dev/ttyACM0
+	pidof keepalivehttpc | xargs kill
+	echo r > /dev/ttyACM0
 	echo date > /root/wheredial_log
 	tail -100 /tmp/wheredial_log >> /root/wheredial_log
 }
 
 reload() {
 	echo "Reloading wheredial"
-	echo r > /dev/ttyACM0
+	stop
 	service_reload /root/wheredial.sh
 }
