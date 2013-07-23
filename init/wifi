@@ -1,0 +1,30 @@
+#!/bin/sh /etc/rc.common
+
+START=901
+STOP=11
+
+SERVICE_DAEMONIZE=2
+
+boot() {
+	echo "Booting wifi util"
+	start
+}
+
+start() {
+	echo "Starting wifi util"
+	service_start /root/wifi_util.sh -d
+}
+
+stop() {
+	echo "Stopping wifi util"
+	service_stop /root/wifi_util.sh
+	pidof wifi_util.sh | xargs kill
+	pidof keepalivehttpc | xargs kill
+	echo date > /root/wheredial_log
+	tail -100 /tmp/wifi_log >> /root/wifi_log
+}
+reload() {
+	echo "Reloading wifi util"
+	grep 'wifi_util.sh' -m 1 | awk '{print $1}' | xargs kill -9
+	service_reload /root/wifi_util.sh
+}
