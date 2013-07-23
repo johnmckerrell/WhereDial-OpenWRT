@@ -23,7 +23,7 @@ while true; do
 
 	# DNS
 	wheredial_dns_ping=$(ping "$wheredial_domain" -c 1)
-	wheredial_dns_status=$(echo "$wheredial_dns_ping" | grep 'received' | awk -F',' '{ print $2}' | awk '{ print $1}')
+	wheredial_dns_status=$(echo "$wheredial_dns_ping" | sed -n 's/.* \([[:digit:]]\) packets received.*/\1/p') 
 	if [ "$wheredial_dns_status" != "1" ]; then
 		log 1 "DNS Error"
 		echo 0 > /dev/ttyACM0
