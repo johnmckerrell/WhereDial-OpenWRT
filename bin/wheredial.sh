@@ -44,6 +44,7 @@ while true; do
 	fi
 
 	# Get the page source 
+    klog L 0
 	wheredial_page_source=$(/root/keepalivehttpc "http://$wheredial_url?&position=$wheredial_position&placeHash=$wheredial_hash" )
 	if [ -n "$wheredial_page_source" ]; then
 		log 2 "Connected to server" 
