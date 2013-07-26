@@ -10,8 +10,13 @@ log() {
 }
 log 0 "Loading the wheredial ($wheredial_mac)"
 
+# Write to kernel log
+klog() {
+	printf "MKEWD%c%03iDWEKM\n" $1 $2 >> /dev/kmsg
+}
+
 # Downloading Config
-wheredial_config=$(/root/keepalivehttpc "http://mapme.at/api/wheredial.cs?config=yes&mac=$wheredial_mac" | tail -1)
+wheredial_config=$(/root/keepalivehttpc "http://mapme.at/api/wheredial.csv?config=yes&mac=$wheredial_mac" | tail -1)
 wheredial_url=$(echo "$wheredial_config" | awk -F, '{print $1":"$2$3}')
 wheredial_domain=$(echo "$wheredial_config" | awk -F, '{print $1}') 
 wheredial_sleep=$(echo "$wheredial_config" | awk -F, '{print $4}')
@@ -19,22 +24,22 @@ wheredial_sleep=$(echo "$wheredial_config" | awk -F, '{print $4}')
 while true; do
 
 	# Turn on the error lights
-	echo 12345 > /dev/ttyACM0
+	klog L 62	
 
 	# DNS
 	wheredial_dns_ping=$(ping "$wheredial_domain" -c 1)
 	wheredial_dns_status=$(echo "$wheredial_dns_ping" | sed -n 's/.* \([[:digit:]]\) packets received.*/\1/p') 
 	if [ "$wheredial_dns_status" != "1" ]; then
 		log 1 "DNS Error"
-		echo 0 > /dev/ttyACM0
+		klog L 63
 		sleep 6
-		echo 543210 > /dev/ttyACM0
+		klog L 0
 		sleep 2
 		continue
 	else
 		wheredial_dns_ip=$(echo "$wheredial_dns_ping" | sed -n 's/.* \([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
 		log 1 "DNS Success, IP: $wheredial_dns_ip" 
-		echo 5 > /dev/ttyACM0
+		klog L 30
 		sleep 1
 	fi
 
@@ -42,13 +47,13 @@ while true; do
 	wheredial_page_source=$(/root/keepalivehttpc "http://$wheredial_url?&position=$wheredial_position&placeHash=$wheredial_hash" )
 	if [ -n "$wheredial_page_source" ]; then
 		log 2 "Connected to server" 
-		echo 4 > /dev/ttyACM0
+		klog L 14
 		sleep 1
 	else 
 		log 2 "Couldn't connect to server" 
-		echo 0 > /dev/ttyACM0 
+		klog L 31
 		sleep 6
-		43210 > /dev/ttyACM
+		klog L 0
 		sleep 2
 		continue
 	fi
@@ -58,13 +63,13 @@ while true; do
 
 	if [ $wheredial_status_code -ge 200 ] &&  [ $wheredial_status_code -le 300 ]; then
 		log 3 "Valid status code: $wheredial_status_code"
- 		echo 3 > /dev/ttyACM0
+ 		klog L 6
 		sleep 1
 	else
 		log 3 "Invalid status code: $wheredial_status_code"
-		echo 0 > /dev/ttyACM0
+		klog L 15
 		sleep 6
-		echo 3210 > /dev/ttyACM0
+		klog L 0	
 		sleep 2
 		continue
 	fi
@@ -86,7 +91,7 @@ while true; do
 		else
 			log 5 "Differing/New hash, moving the dial $wheredial_position, hash: $wheredial_hash"
 			# Send move command to the dial
-			echo "t$wheredial_position" > /dev/ttyACM0
+			klog T "$wheredial_position"
 			
 			# Wait for dial to turn
 			diff=$(($wheredial_last_postion-$wheredial_position))
@@ -97,12 +102,12 @@ while true; do
 		fi
 		wheredial_last_hash="$wheredial_hash"
 		wheredial_last_position="$wheredial_position"
-		echo 21 > /dev/ttyACM0 
+		klog L 0
 	else
 		echo "[$(uptime | awk '{print $1}')] - 4. Don't have page content" >> "$log_file" 	
-		echo 0 > /dev/ttyACM0
+		klog L 7
 		sleep 6
-		echo 210
+		klog L 0
 		sleep 2
 		continue
 	fi
