@@ -1,4 +1,4 @@
-#!/bin/ash
+#!/bin/sh
 
 # Get the users MAC address
 wheredial_mac=$(ifconfig | grep -m 1 -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}') 
@@ -15,20 +15,80 @@ klog() {
 	printf "MKEWD%c%03iDWEKM\n" $1 $2 >> /dev/kmsg
 }
 
-# Downloading Config
-wheredial_config=$(/root/keepalivehttpc "http://mapme.at/api/wheredial.csv?config=yes&mac=$wheredial_mac" | tail -1)
-wheredial_url=$(echo "$wheredial_config" | awk -F, '{print $1":"$2$3}')
-wheredial_domain=$(echo "$wheredial_config" | awk -F, '{print $1}') 
-wheredial_sleep=$(echo "$wheredial_config" | awk -F, '{print $4}')
+# Download the config
+while true; do
+
+	# Turn on the lights
+	klog L 62
+
+	# DNS
+	wheredial_dns_ping=$(ping mapme.at -c 1)
+	wheredial_dns_status=$(echo "$wheredial_dns_ping" | sed -n 's/.* \([[:digit:]]\) packets received.*/\1/p')
+        if [ "$wheredial_dns_status" != "1" ]; then
+		log 1 "Config: DNS Error"
+		klog L 63
+		sleep 6
+		klog L 0
+		sleep 2
+		continue
+	else
+		wheredial_dns_ip=$(echo "$wheredial_dns_ping" | sed -n 's/.* \([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+		log 1 "Config: DNS Success, IP: $wheredial_dns_ip"
+		klog L 30
+		sleep 1
+	fi
+	
+	# Get the page source 
+	wheredial_page_source=$(/root/keepalivehttpc "http://mapme.at/api/wheredial.csv?config=yes&mac=$wheredial_mac")
+	if [ -n "$wheredial_page_source" ]; then
+		log 2 "config: Connected to server" 
+		klog L 14
+		sleep 1
+	else 
+		log 2 "Config: Couldn't connect to server" 
+		klog L 31
+		sleep 6
+		klog L 0
+		sleep 2
+		continue
+	fi
+	
+	# Status Code
+	wheredial_status_code=$(echo "$wheredial_page_source"| grep "HTTP/1.1" | awk '{print $2}')
+
+	if [ $wheredial_status_code -ge 200 ] &&  [ $wheredial_status_code -le 300 ]; then
+		log 3 "Config: Valid status code: $wheredial_status_code"
+ 		klog L 6
+		sleep 1
+	else
+		log 3 "Config: Invalid status code: $wheredial_status_code"
+		klog L 15
+		sleep 6
+		klog L 0	
+		sleep 2
+		continue
+	fi
+	
+	# Get page contnet
+	wheredial_page_content=$(echo "$wheredial_page_source" | tail -1)
+	
+	# Define Config parameters
+	wheredial_url=$(echo "$wheredial_page_content" | awk -F, '{print $1":"$2$3}')
+	wheredial_domain=$(echo "$wheredial_page_content" | awk -F, '{print $1}') 
+	wheredial_sleep=$(echo "$wheredial_page_content" | awk -F, '{print $4}')
+	break
+	
+done
 
 while true; do
 
-	# Turn on the error lights
+	# Turn on the lights
 	klog L 62	
 
 	# DNS
 	wheredial_dns_ping=$(ping "$wheredial_domain" -c 1)
 	wheredial_dns_status=$(echo "$wheredial_dns_ping" | sed -n 's/.* \([[:digit:]]\) packets received.*/\1/p') 
+
 	if [ "$wheredial_dns_status" != "1" ]; then
 		log 1 "DNS Error"
 		klog L 63
@@ -40,11 +100,12 @@ while true; do
 		wheredial_dns_ip=$(echo "$wheredial_dns_ping" | sed -n 's/.* \([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
 		log 1 "DNS Success, IP: $wheredial_dns_ip" 
 		klog L 30
-		sleep 1
+		sleep 2
 	fi
 
 	# Get the page source 
-    klog L 0
+	
+	klog L 0
 	wheredial_page_source=$(/root/keepalivehttpc "http://$wheredial_url?&position=$wheredial_position&placeHash=$wheredial_hash" )
 	if [ -n "$wheredial_page_source" ]; then
 		log 2 "Connected to server" 
@@ -92,6 +153,7 @@ while true; do
 		else
 			log 5 "Differing/New hash, moving the dial $wheredial_position, hash: $wheredial_hash"
 			# Send move command to the dial
+			klog L 2
 			klog T "$wheredial_position"
 			
 			# Wait for dial to turn
@@ -105,7 +167,7 @@ while true; do
 		wheredial_last_position="$wheredial_position"
 		klog L 0
 	else
-		echo "[$(uptime | awk '{print $1}')] - 4. Don't have page content" >> "$log_file" 	
+		log 5 "Don't have page content"
 		klog L 7
 		sleep 6
 		klog L 0
