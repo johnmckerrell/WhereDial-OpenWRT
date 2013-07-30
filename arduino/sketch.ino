@@ -71,7 +71,6 @@ void loop() {
         }
         prev =0;
         actual =0;
-
   }
 }
 void turn()
