@@ -51,7 +51,7 @@ void loop() {
 
     }
     int num = atoi(value+1);
-    Serial.println(num);
+
     switch(value[0]){
       case 'T':
         prev=actual;
@@ -63,7 +63,6 @@ void loop() {
       case 'L':
         for(int i=0; i<6; i++){
           digitalWrite(i+2,((num&(1<<i)) == (1<<i))?HIGH:LOW);
-          Serial.println(1<<i);
         }
         break;
       case 'R':
