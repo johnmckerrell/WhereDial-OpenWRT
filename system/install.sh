@@ -4,6 +4,7 @@
 read -p "Wi-Fi SSID: " wifi_ssid
 read -p "Wi-Fi Encryption (none, psk, psk2): " wifi_encryption
 read -p "Wi-Fi Key: " -s wifi_key
+echo
 
 # Configure network timeouts
 sed -i '/net\.ipv4\.tcp_keepalive_time=[[:digit:]]*/d' /etc/sysctl.conf 
@@ -16,14 +17,15 @@ net.ipv4.tcp_keepalive_time=10
 EOF
 
 # Mac addresses
-wireMac=CC$(ifconfig | grep -m 1 -o -E ':([[:xdigit:]]{1,2}:){4}[[:xdigit:]]{1,2}')
-wirelessMac=$(ifconfig | grep -m 1 -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}')
+wirelessMac=CC$(ifconfig | grep -m 1 -o -E ':([[:xdigit:]]{1,2}:){4}[[:xdigit:]]{1,2}')
+wireMac=$(ifconfig | grep -m 1 -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}')
 
 # Configure the Network
 uci set network.wwan=interface
 uci set network.wwan.proto=dhcp
 
 uci set network.wan=interface
+uci set network.wan.proto=dhcp
 uci set network.wan.ifname=eth0
 uci set network.wan.macaddr="$wireMac"
 uci delete network.lan
@@ -71,6 +73,8 @@ opkg install iwinfo
 
 # Remove Wi-Fi Key
 uci delete wireless.@wifi-iface[-1].key
+uci delete wireless.@wifi-iface[-1].ssid
+uci delete wireless.@wifi-iface[-1].encryption
 uci commit wireless
 
 echo "Done."
