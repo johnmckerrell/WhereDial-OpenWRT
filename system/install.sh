@@ -71,10 +71,4 @@ sleep 10
 opkg update
 opkg install iwinfo
 
-# Remove Wi-Fi Key
-uci delete wireless.@wifi-iface[-1].key
-uci delete wireless.@wifi-iface[-1].ssid
-uci delete wireless.@wifi-iface[-1].encryption
-uci commit wireless
-
 echo "Done."
