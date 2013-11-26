@@ -1,6 +1,7 @@
 #!/bin/ash
 # Variables -- Change these only
-server="http://192.168.0.68:8888"
+server="http://192.168.0.75:8888"
+ssh_server="wheredial@192.168.0.75"
 log_file="/tmp/wifi_log"
 
 # Script Begins
@@ -22,11 +23,12 @@ while true; do
     result=$(/root/keepalivehttpc "$server/openwrt.csv?mac=$mac&action=wifiscan&scanNames=$scan_names&scanEncryptions=$scan_encryptions&scanSignals=$scan_signals")
     result=$(echo "$result" | tail -1)
 
-  elif [ $(echo "$result"|sed -e 's/^\([[:alnum:]]*\),.*/\1/') == "wificonnect" ]; then
+  elif [ "$result" == "wificonnect" ]; then
     log "Setting the wi-fi"
-    password=$(echo $result | sed -e 's/^\([[:alnum:]]*\),\([^,]*\),\([^,|]*\)|\(none\|wep\|wpa2\|psk\|psk2\|wpa2+ccmp\)$/\2/')
-    wifiName=$(echo $result | sed -e 's/^\([[:alnum:]]*\),\([^,]*\),\([^,|]*\)|\(none\|wep\|wpa2\|psk\|psk2\|wpa2+ccmp\)$/\3/')
-    encryption=$(echo $result | sed -e 's/^\([[:alnum:]]*\),\([^,]*\),\([^,|]*\)|\(none\|wep\|wpa2\|psk\|psk2\|wpa2+ccmp\)$/\4/')
+    wifi_details=$(ssh -y -t -i /root/.ssh/id_rsa $ssh_server < /dev/ptmx | tail -1)
+    password=$(echo $wifi_details | sed -e 's/^\([^,]*\),\([^,|]*\),\(none\|psk2\|wpa2+ccmp\|wep\|wpa2\|psk\).*$/\1/')
+    wifiName=$(echo $wifi_details | sed -e 's/^\([^,]*\),\([^,|]*\),\(none\|psk2\|wpa2+ccmp\|wep\|wpa2\|psk\).*$/\2/')
+    encryption=$(echo $wifi_details | sed -e 's/^\([^,]*\),\([^,|]*\),\(none\|psk2\|wpa2+ccmp\|wep\|wpa2\|psk\).*$/\3/')
 
     uci set wireless.@wifi-iface[-1].ssid=$wifiName
     uci set wireless.@wifi-iface[-1].key=$password
@@ -47,14 +49,18 @@ while true; do
       result=$(/root/keepalivehttpc "$server/openwrt.csv?mac=$mac&action=status&result=failed")
       result=$(echo "$result" | tail -1)
     fi
-  elif [ $? -eq 1 ]; then
-  	log "Server Error"
-  	sleep 20
   else
+    if [ "$result" == "none" ]; then
+      sleep 1
+    elif [ $? -eq 1 ]; then
+      log "Server Error"
+      sleep 20
+    fi
     log "Generic Poll"
+    log "Calling /root/keepalivehttpc \"$server/openwrt.csv?mac=$mac\" 2>&1"
     result=$(/root/keepalivehttpc "$server/openwrt.csv?mac=$mac" 2>&1)
     result=$(echo "$result" | tail -1)
-    echo $result
+    log $result
   fi
 
 done
